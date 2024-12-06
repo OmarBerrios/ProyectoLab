@@ -5,185 +5,395 @@
  */
 package proyectolab;
 
+import java.io.*;
+import java.util.*;
 import java.util.Scanner;
 
 /**
  *
  * @author omarr
  */
-public class Menu {
-    public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        Ghost ghost = new Ghost(); 
-        int option;
+class Ghost {
+    private Player currentUser;
+    private char[][] board;
+    private int difficulty;
+    private int mode;
+    private final String FILE_PATH = "players.txt";
+    private final int[] ghostCount = {8, 4, 2};
+    private final Random random = new Random();
+    private static final char EMPTY = '.';
+    private int player1Good = 0, player1Bad = 0, player2Good = 0, player2Bad = 0;
+    public static Scanner scanner = new Scanner(System.in);
 
-        do {
-            System.out.println("\nMenu de Inicio:");
-            System.out.println("1. Login");
-            System.out.println("2. Crear Player");
-            System.out.println("3. Salir");
-            System.out.print("Seleccione una opcion: ");
-            option = scanner.nextInt();
-            scanner.nextLine(); 
+    private Player[] players; // Arreglo de jugadores
+    private int playerCount;  // Número actual de jugadores
 
-            switch (option) {
-                case 1 -> {
-                    System.out.print("Username: ");
-                    String username = scanner.nextLine();
-                    System.out.print("Password: ");
-                    String password = scanner.nextLine();
-                    if (ghost.login(username, password) != null) {
-                        showMainMenu(ghost, scanner);
-                    } else {
-                        System.out.println("Credenciales incorrectas. Intente nuevamente.");
-                    }
-                }
-                case 2 -> {
-                    System.out.print("Ingrese un username: ");
-                    String newUsername = scanner.nextLine();
-                    System.out.print("Ingrese un password: ");
-                    String newPassword = scanner.nextLine();
-                    ghost.registerPlayer(newUsername, newPassword);
-                }
-                case 3 -> System.out.println("Saliendo del programa. Hasta luego!");
-                default -> System.out.println("Opcion no valida.");
-            }
-        } while (option != 3);
-
-        scanner.close();
+    public Ghost() {
+        this.board = new char[6][6];
+        this.difficulty = 0; // Normal
+        this.mode = 0; // Aleatorio
+        this.players = new Player[100]; // Capacidad máxima inicial de 100 jugadores
+        this.playerCount = 0;
+        initializeBoard();
+        loadPlayers();
     }
 
-    static void showMainMenu(Ghost ghost, Scanner scanner) {
-        int option;
-        do {
-            System.out.println("\nMenu Principal:");
-            System.out.println("1. Jugar Ghosts");
-            System.out.println("2. Reportes");
-            System.out.println("3. Mi Perfil");
-            System.out.println("4. Configuracion");
-            System.out.println("5. Cerrar Sesion");
-            System.out.print("Seleccione una opcion: ");
-            option = scanner.nextInt();
-            scanner.nextLine();
-
-            switch (option) {
-                case 1 -> playGhosts(ghost, scanner);
-                case 2 -> showReports(ghost, scanner);
-                case 3 -> showProfile(ghost, scanner);
-                case 4 -> configureSettings(ghost, scanner);
-                case 5 -> {
-                    ghost.logout();
-                    System.out.println("Sesion cerrada. Regresando al menu de inicio...");
-                }
-                default -> System.out.println("Opcion no valida.");
+    private void initializeBoard() {
+        for (int i = 0; i < board.length; i++) {
+            for (int j = 0; j < board[i].length; j++) {
+                board[i][j] = EMPTY;
             }
-        } while (option != 5);
-    }
-
-    static void playGhosts(Ghost ghost, Scanner scanner) {
-        System.out.print("Ingrese el username del jugador 2: ");
-        String opponentUsername = scanner.nextLine();
-
-        if (ghost.isUserExists(opponentUsername)) {
-            System.out.println("Iniciando el juego de Ghosts...");
-            ghost.playGame(opponentUsername);
-        } else {
-            System.out.println("El usuario ingresado no existe. Intente nuevamente.");
         }
     }
 
-    static void showReports(Ghost ghost, Scanner scanner) {
-        int option;
-        do {
-            System.out.println("\nReportes:");
-            System.out.println("1. Descripcion de mis ultimos 10 juegos");
-            System.out.println("2. Ranking de jugadores");
-            System.out.println("3. Regresar");
-            System.out.print("Seleccione una opcion: ");
-            option = scanner.nextInt();
-            scanner.nextLine();
-
-            switch (option) {
-                case 1 -> ghost.showLast10Games();
-                case 2 -> ghost.showRanking();
-                case 3 -> System.out.println("Regresando al menu principal...");
-                default -> System.out.println("Opcion no valida.");
-            }
-        } while (option != 3);
+    public void registerPlayer(String username, String password) {
+        if (isUserExists(username)) {
+            System.out.println("El username ya existe. Intente con otro.");
+            return;
+        }
+        if (playerCount >= players.length) {
+            System.out.println("No se pueden registrar más jugadores. Capacidad máxima alcanzada.");
+            return;
+        }
+        players[playerCount++] = new Player(username, password);
+        savePlayers();
+        System.out.println("Jugador registrado exitosamente.");
     }
 
-    static void showProfile(Ghost ghost, Scanner scanner) {
-        Player currentUser = ghost.getCurrentUser();
-        if (currentUser != null) {
-            int option;
-            do {
-                System.out.println("\nMi Perfil:");
-                System.out.println("1. Ver Mis Datos");
-                System.out.println("2. Cambiar Contraseña");
-                System.out.println("3. Eliminar Cuenta");
-                System.out.println("4. Regresar");
-                System.out.print("Seleccione una opcion: ");
-                option = scanner.nextInt();
-                scanner.nextLine();
+    public Player login(String username, String password) {
+        for (int i = 0; i < playerCount; i++) {
+            if (players[i].getUsername().equals(username) && players[i].getPassword().equals(password)) {
+                currentUser = players[i];
+                System.out.println("Inicio de sesion exitoso.");
+                return currentUser;
+            }
+        }
+        System.out.println("Credenciales incorrectas.");
+        return null;
+    }
 
-                switch (option) {
-                    case 1 -> {
-                        System.out.println("Datos del Usuario:");
-                        System.out.println("Username: " + currentUser.getUsername());
-                        System.out.println("Puntos: " + currentUser.getPoints());
+    public void logout() {
+        currentUser = null;
+        System.out.println("Sesion cerrada.");
+    }
+
+    public Player getCurrentUser() {
+        return currentUser;
+    }
+
+    public void deleteUser() {
+        if (currentUser != null) {
+            for (int i = 0; i < playerCount; i++) {
+                if (players[i] == currentUser) {
+                    // Eliminar el jugador desplazando elementos
+                    for (int j = i; j < playerCount - 1; j++) {
+                        players[j] = players[j + 1];
                     }
-                    case 2 -> {
-                        System.out.print("Ingrese la nueva contraseña: ");
-                        String newPassword = scanner.nextLine();
-                        ghost.changePassword(newPassword);
-                        System.out.println("Contraseña actualizada.");
-                    }
-                    case 3 -> {
-                        System.out.print("¿Esta seguro que desea eliminar su cuenta? (S/N): ");
-                        char confirm = scanner.nextLine().toUpperCase().charAt(0);
-                        if (confirm == 'S') {
-                            ghost.deleteUser();
-                            System.out.println("Cuenta eliminada exitosamente.");
-                            return; 
-                        } else {
-                            System.out.println("Operacion cancelada.");
-                        }
-                    }
-                    case 4 -> System.out.println("Regresando al menu principal...");
-                    default -> System.out.println("Opcion no valida.");
+                    players[--playerCount] = null; // Reducir el contador y limpiar la posición
+                    savePlayers();
+                    System.out.println("Cuenta eliminada exitosamente.");
+                    currentUser = null;
+                    return;
                 }
-            } while (option != 4);
+            }
         } else {
             System.out.println("No hay un usuario logueado.");
         }
     }
 
-    static void configureSettings(Ghost ghost, Scanner scanner) {
-        int option;
-        do {
-            System.out.println("\nConfiguracion:");
-            System.out.println("1. Seleccionar dificultad");
-            System.out.println("2. Seleccionar modo");
-            System.out.println("3. Regresar");
-            System.out.print("Seleccione una opcion: ");
-            option = scanner.nextInt();
-
-            switch (option) {
-                case 1 -> {
-                    System.out.print("Elija dificultad (0: Normal, 1: Experto, 2: Genio): ");
-                    int difficulty = scanner.nextInt();
-                    ghost.setDifficulty(difficulty);
-                    System.out.println("Dificultad actualizada.");
-                }
-                case 2 -> {
-                    System.out.print("Elija modo (0: Aleatorio, 1: Manual): ");
-                    int mode = scanner.nextInt();
-                    ghost.setMode(mode);
-                    System.out.println("Modo actualizado.");
-                }
-                case 3 -> System.out.println("Regresando al menu principal...");
-                default -> System.out.println("Opcion no valida.");
+    public void showLast10Games() {
+        if (currentUser != null) {
+            System.out.println("Últimos 10 juegos de " + currentUser.getUsername() + ":");
+            for (String log : currentUser.getGameLogs()) {
+                System.out.println("- " + log);
             }
-        } while (option != 3);
+        } else {
+            System.out.println("No hay un usuario logueado.");
+        }
+    }
+
+    public void showRanking() {
+        Player[] sortedPlayers = Arrays.copyOf(players, playerCount);
+        Arrays.sort(sortedPlayers, 0, playerCount, (p1, p2) -> Integer.compare(p2.getPoints(), p1.getPoints()));
+
+        System.out.println("Ranking de jugadores:");
+        for (int i = 0; i < playerCount; i++) {
+            System.out.println(sortedPlayers[i].getUsername() + " - Puntos: " + sortedPlayers[i].getPoints());
+        }
+    }
+
+    public void playGame(String opponentUsername) {
+        Player opponent = getPlayerByUsername(opponentUsername);
+        if (opponent == null) {
+            System.out.println("El jugador oponente no existe.");
+            return;
+        }
+
+        // Configurar fantasmas
+        setupGhosts();
+
+        // Turnos de juego
+        boolean gameActive = true;
+        int turn = 0; // Alterna entre jugadores: 0 - currentUser, 1 - opponent
+        printBoard(turn == 0);
+        while (gameActive) {
+            askCoordinates(scanner, "Ingrese fila y columna del fantasma a mover (-1 -1 para salir): "); // Mostrar el tablero según el turno
+            Player currentPlayer = (turn == 0) ? currentUser : opponent;
+            System.out.println("Turno de: " + currentPlayer.getUsername());
+            gameActive = takeTurn(currentPlayer, turn == 0);
+            turn = 1 - turn;
+        }
+    }
+
+    private void setupGhosts() {
+        int count = ghostCount[difficulty];
+        System.out.println("Configurando fantasmas...");
+        if (mode == 0) {
+            randomSetup(count, true);
+            randomSetup(count, false);
+        } else {
+            manualSetup(count, true);
+            manualSetup(count, false);
+        }
+    }
+
+    private void randomSetup(int count, boolean isPlayer1) {
+        for (int i = 0; i < count; i++) {
+            char type = (i < count / 2) ? (isPlayer1 ? 'B' : 'b') : (isPlayer1 ? 'M' : 'm');
+            placeGhostRandomly(type, isPlayer1);
+        }
+    }
+
+    private void placeGhostRandomly(char type, boolean isPlayer1) {
+        int row, col;
+        do {
+            row = random.nextInt(2) + (isPlayer1 ? 0 : 4);
+            col = random.nextInt(6);
+        } while (board[row][col] != EMPTY || isExit(row, col));
+        board[row][col] = type;
+    }
+
+    private boolean isExit(int row, int col) {
+        return (row == 0 && (col == 0 || col == 5)) || (row == 5 && (col == 0 || col == 5));
+    }
+
+    private void manualSetup(int count, boolean isPlayer1) {
+        Scanner scanner = new Scanner(System.in);
+        for (int i = 0; i < count; i++) {
+            char type = (i < count / 2) ? (isPlayer1 ? 'B' : 'b') : (isPlayer1 ? 'M' : 'm');
+            boolean placed = false;
+            while (!placed) {
+                System.out.print("Ingrese fila y columna para el fantasma " + (type == 'B' || type == 'b' ? "bueno" : "malo") + ": ");
+                int row = scanner.nextInt();
+                int col = scanner.nextInt();
+                if (row >= (isPlayer1 ? 0 : 4) && row < (isPlayer1 ? 2 : 6) && col >= 0 && col < 6 && board[row][col] == EMPTY && !isExit(row, col)) {
+                    board[row][col] = type;
+                    placed = true;
+                } else {
+                    System.out.println("Posicion invalida. Intente de nuevo.");
+                }
+            }
+        }
+    }
+
+    public void printBoard(boolean isPlayer1) {
+        System.out.println("\nTablero:");
+        for (int i = 0; i < board.length; i++) {
+            for (int j = 0; j < board[i].length; j++) {
+                char cell = board[i][j];
+                if ((cell == 'b' || cell == 'm') && isPlayer1) cell = 'X'; // Ocultar fantasmas del oponente
+                if ((cell == 'B' || cell == 'M') && !isPlayer1) cell = 'X'; // Ocultar fantasmas del oponente
+                System.out.print(cell + " ");
+            }
+            System.out.println();
+        }
+    }
+
+    private void loadPlayers() {
+        try (BufferedReader reader = new BufferedReader(new FileReader(FILE_PATH))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                Player player = Player.fromString(line);
+                if (player != null) {
+                    players[playerCount++] = player;
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("Error al cargar jugadores.");
+        }
+    }
+
+    private void savePlayers() {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(FILE_PATH))) {
+            for (int i = 0; i < playerCount; i++) {
+                writer.write(players[i].toString());
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            System.out.println("Error al guardar jugadores.");
+        }
+    }
+
+    boolean isUserExists(String username) {
+        for (int i = 0; i < playerCount; i++) {
+            if (players[i].getUsername().equals(username)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Player getPlayerByUsername(String username) {
+        for (int i = 0; i < playerCount; i++) {
+            if (players[i].getUsername().equals(username)) {
+                return players[i];
+            }
+        }
+        return null;
+    }
+    
+    private int[] askCoordinates(Scanner scanner, String prompt) {
+        int[] coordinates = new int[2];
+        boolean validInput = false;
+
+        while (!validInput) {
+            System.out.print(prompt);
+            try {
+                coordinates[0] = scanner.nextInt(); // Fila
+                coordinates[1] = scanner.nextInt(); // Columna
+
+                if (coordinates[0] >= 0 && coordinates[0] < 6 && coordinates[1] >= 0 && coordinates[1] < 6) {
+                    validInput = true; // Las coordenadas están dentro del rango
+                } else {
+                    System.out.println("Coordenadas fuera del rango. Intente nuevamente (0-5).");
+                }
+            } catch (InputMismatchException e) {
+                System.out.println("Entrada no válida. Ingrese números enteros.");
+                scanner.nextLine(); // Limpiar la entrada inválida
+            }
+        }
+        takeTurn(currentUser, true);
+        return coordinates;
+    }
+
+    private boolean takeTurn(Player currentPlayer, boolean isPlayer1) {
+        Scanner scanner = new Scanner(System.in);
+
+        // Pedir coordenadas del fantasma a mover
+        int[] source = askCoordinates(scanner, "Ingrese fila y columna del fantasma a mover (-1 -1 para salir): ");
+
+        // Verificar si el jugador quiere retirarse
+        if (source[0] == -1 && source[1] == -1) {
+            System.out.print("¿Está seguro que desea retirarse? (S/N): ");
+            char confirm = scanner.next().toUpperCase().charAt(0);
+            if (confirm == 'S') {
+                System.out.println(currentPlayer.getUsername() + " se ha retirado del juego.");
+                return false; // El otro jugador gana por retiro
+            } else {
+                return true; // Continuar el turno
+            }
+        }
+
+        // Validar selección del fantasma
+        if (!isValidMove(source[0], source[1], isPlayer1)) {
+            System.out.println("La selección no es válida. Intente nuevamente.");
+            return true; // Repetir turno
+        }
+
+        // Pedir coordenadas del destino
+        int[] destination = askCoordinates(scanner, "Ingrese fila y columna destino: ");
+        if (!processMove(source[0], source[1], destination[0], destination[1], isPlayer1)) {
+            System.out.println("Movimiento no válido. Intente nuevamente.");
+            return true; // Repetir turno
+        }
+
+        // Verificar condiciones de victoria
+        return checkWinConditions();
+    }
+    
+    private boolean isValidMove(int row, int col, boolean isPlayer1) {
+        if (row < 0 || row >= 6 || col < 0 || col >= 6 || board[row][col] == EMPTY) {
+            return false; // Fuera del rango o celda vacía
+        }
+        char ghost = board[row][col];
+        return isPlayer1 ? ghost == 'B' || ghost == 'M' : ghost == 'b' || ghost == 'm';
+    }
+    
+    private boolean processMove(int row, int col, int destRow, int destCol, boolean isPlayer1) {
+        // Validar que el destino está en una casilla adyacente
+        if (Math.abs(destRow - row) > 1 || Math.abs(destCol - col) > 1 || destRow < 0 || destRow >= 6 || destCol < 0 || destCol >= 6) {
+            return false;
+        }
+
+        // Verificar si el destino está ocupado
+        char targetGhost = board[destRow][destCol];
+        if (targetGhost != EMPTY && (isPlayer1 ? targetGhost == 'B' || targetGhost == 'M' : targetGhost == 'b' || targetGhost == 'm')) {
+            return false; // No se puede mover a una casilla ocupada por un fantasma propio
+        }
+
+        // Comer fantasma enemigo si corresponde
+        if (targetGhost != EMPTY) {
+            System.out.println("¡Te has comido un fantasma!");
+            if (isPlayer1) {
+                if (targetGhost == 'b') {
+                    player2Good--;
+                } else {
+                    player2Bad--;
+                }
+            } else {
+                if (targetGhost == 'B') {
+                    player1Good--;
+                } else {
+                    player1Bad--;
+                }
+            }
+        }
+
+        // Mover el fantasma
+        board[destRow][destCol] = board[row][col];
+        board[row][col] = EMPTY;
+
+        // Verificar si un fantasma bueno alcanza la salida
+        if (isExit(destRow, destCol)) {
+            char movedGhost = board[destRow][destCol];
+            if ((movedGhost == 'B' && isPlayer1) || (movedGhost == 'b' && !isPlayer1)) {
+                System.out.println("¡Un fantasma bueno ha escapado!");
+                return false; // Fin del juego
+            }
+        }
+
+        return true;
+    }
+    
+    private boolean checkWinConditions() {
+        if (player1Good == 0) {
+            System.out.println("¡" + currentUser.getUsername() + " gana porque capturó todos los fantasmas buenos del oponente!");
+            return false;
+        }
+        if (player2Good == 0) {
+            System.out.println("¡El oponente gana porque capturó todos tus fantasmas buenos!");
+            return false;
+        }
+        if (player1Bad == 0) {
+            System.out.println("¡El oponente gana porque tú perdiste todos tus fantasmas malos!");
+            return false;
+        }
+        if (player2Bad == 0) {
+            System.out.println("¡" + currentUser.getUsername() + " gana porque el oponente perdió todos sus fantasmas malos!");
+            return false;
+        }
+        return true; // El juego continúa
+    }
+
+    void setDifficulty(int difficulty) {
+        this.difficulty = difficulty;
+    }
+
+    void setMode(int mode) {
+        this.mode = mode;
+    }
+
+    void changePassword(String newPassword) {
+        throw new UnsupportedOperationException("Not supported yet."); 
     }
 }
